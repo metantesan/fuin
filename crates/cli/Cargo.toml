@@ -6,7 +6,19 @@ license.workspace = true
 authors.workspace = true
 repository.workspace = true
 
+[[bin]]
+name = "fuin"
+path = "src/main.rs"
+
 [dependencies]
+clap.workspace = true
+fuin_controller.workspace = true
+fuin_core.workspace = true
+kube.workspace = true
+k8s-openapi.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
 
 [lints]
 workspace = true

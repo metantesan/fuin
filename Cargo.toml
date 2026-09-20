@@ -17,6 +17,8 @@ fuin_controller = { path = "crates/controller" }
 eyre = { version = "0.6" }
 color-eyre = { version = "0.6" }
 thiserror = { version = "2" }
+# CLI
+clap = { version = "4", features = ["derive", "color"] }
 # Kube
 kube = { version = "4.2", features = ["runtime", "derive"] }
 k8s-openapi = { version = "0.28", features = ["latest", "schemars"] }

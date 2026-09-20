@@ -1,0 +1,11 @@
+apiVersion: v2
+name: fuin
+description: Helm chart for the Fuin controller
+type: application
+version: 0.0.1
+appVersion: "0.0.1"
+home: https://github.com/metantesan/fuin
+sources:
+  - https://github.com/metantesan/fuin
+maintainers:
+  - name: hikari

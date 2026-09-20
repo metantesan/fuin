@@ -1,0 +1,45 @@
+# The controller runs as a single pod.
+replicaCount: 1
+
+# Container image containing the Fuin controller binary.
+image:
+  repository: ghcr.io/metantesan/fuin
+  pullPolicy: IfNotPresent
+  tag: "letest"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+# The controller needs a service account for Kubernetes API access.
+serviceAccount:
+  create: true
+  automount: true
+  annotations: {}
+  name: ""
+
+# Extra pod metadata.
+podAnnotations: {}
+podLabels: {}
+podSecurityContext: {}
+securityContext: {}
+
+# Optional controller command-line arguments and environment variables.
+args: []
+env: []
+
+# The controller's HTTP port, if the controller exposes one.
+service:
+  type: ClusterIP
+  port: 8080
+  annotations: {}
+
+resources: {}
+
+# Disabled until the controller exposes these endpoints.
+livenessProbe: null
+readinessProbe: null
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

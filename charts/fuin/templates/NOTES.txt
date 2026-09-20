@@ -1,0 +1,14 @@
+The Fuin controller has been deployed.
+
+To check the deployment:
+
+  kubectl get pods -l "app.kubernetes.io/instance={{ .Release.Name }}"
+
+The default image is {{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}.
+Set image.repository and image.tag to use a published controller image.
+
+FuinSealedSecret resources keep field names readable while encrypting their values:
+
+  spec:
+    encryptedData:
+      DB_URL: <encrypted value>

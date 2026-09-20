@@ -1,0 +1,50 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "fuin.fullname" . }}
+  labels:
+    {{- include "fuin.labels" . | nindent 4 }}
+rules:
+  - apiGroups:
+      - fuin.abr.sh
+    resources:
+      - fuinprivatekeys
+      - fuinprivatekeys/status
+      - fuinpublickeys
+      - fuinpublickeys/status
+      - fuinsealedsecrets
+      - fuinsealedsecrets/status
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "fuin.fullname" . }}
+  labels:
+    {{- include "fuin.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "fuin.serviceAccountName" . }}
+roleRef:
+  kind: ClusterRole
+  name: {{ include "fuin.fullname" . }}
+  apiGroup: rbac.authorization.k8s.io

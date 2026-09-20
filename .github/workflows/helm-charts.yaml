@@ -1,0 +1,38 @@
+name: Build and Deploy  Helm charts
+
+on:
+  push:
+    branches: ["main"]
+
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    concurrency: deploy-${{ github.ref }}
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/checkout@v7
+        with:
+          ref: gh-pages
+          path: out
+
+      - uses: azure/setup-helm@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: lint
+        run: make lint
+
+      - name: package
+        run: make
+
+      - uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: out

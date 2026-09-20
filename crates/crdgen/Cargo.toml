@@ -1,0 +1,15 @@
+[package]
+name = "crdgen"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+kube.workspace = true
+fuin_controller.workspace = true
+serde_yaml_ng.workspace = true
+serde.workspace = true
+[lints]
+workspace = true

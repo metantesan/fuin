@@ -1,0 +1,19 @@
+apiVersion: v1
+entries:
+  fuin:
+  - apiVersion: v2
+    appVersion: 0.0.1
+    created: "2026-09-20T15:54:44.680027519Z"
+    description: Helm chart for the Fuin controller
+    digest: 99f862a893a9e1f627ce2d6165a32460aca2aa85ad8b2faa1b3c1a869e020d94
+    home: https://github.com/metantesan/fuin
+    maintainers:
+    - name: hikari
+    name: fuin
+    sources:
+    - https://github.com/metantesan/fuin
+    type: application
+    urls:
+    - https://metantesan.github.io/fuin/fuin-0.0.1.tgz
+    version: 0.0.1
+generated: "2026-09-20T15:54:44.679478021Z"

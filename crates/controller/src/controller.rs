@@ -197,11 +197,11 @@ async fn reconcile_inner(sealed_secret: &FuinSealedSecret, context: &Context) ->
     }
 
     let secret_name = output_secret_name(sealed_secret);
-    let secret_type = sealed_secret
-        .spec
-        .template
-        .as_ref()
-        .and_then(|template| template.r#type.clone());
+    let template = sealed_secret.spec.template.as_ref();
+    let secret_type = template.and_then(|template| template.r#type.clone());
+    let immutable = template.and_then(|template| template.immutable);
+    let labels = template_metadata_map(template, "labels");
+    let annotations = template_metadata_map(template, "annotations");
     let owner_reference = sealed_secret
         .controller_owner_ref(&())
         .ok_or_else(|| Error::Configuration("sealed secret has no owner reference".into()))?;
@@ -209,6 +209,8 @@ async fn reconcile_inner(sealed_secret: &FuinSealedSecret, context: &Context) ->
         metadata: ObjectMeta {
             name: Some(secret_name.clone()),
             namespace: Some(namespace.clone()),
+            labels,
+            annotations,
             owner_references: Some(vec![owner_reference]),
             ..ObjectMeta::default()
         },
@@ -216,6 +218,10 @@ async fn reconcile_inner(sealed_secret: &FuinSealedSecret, context: &Context) ->
         immutable: None,
         string_data: None,
         type_: secret_type,
+    };
+    let secret = Secret {
+        immutable,
+        ..secret
     };
     let secrets: Api<Secret> = Api::namespaced(context.client.clone(), &namespace);
     secrets
@@ -248,6 +254,18 @@ fn output_secret_name(sealed_secret: &FuinSealedSecret) -> String {
         .and_then(|name| name.as_str())
         .map(ToOwned::to_owned)
         .unwrap_or_else(|| sealed_secret.name_any())
+}
+
+fn template_metadata_map(
+    template: Option<&crate::types::SecretTemplate>,
+    field: &str,
+) -> Option<BTreeMap<String, String>> {
+    let values = template?.metadata.as_ref()?.get(field)?.as_object()?;
+    let result = values
+        .iter()
+        .filter_map(|(key, value)| value.as_str().map(|value| (key.clone(), value.to_owned())))
+        .collect::<BTreeMap<_, _>>();
+    (!result.is_empty()).then_some(result)
 }
 
 async fn patch_status(

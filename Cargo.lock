@@ -921,6 +921,7 @@ dependencies = [
  "fuin_core",
  "k8s-openapi",
  "kube",
+ "serde_json",
  "serde_yaml_ng",
  "thiserror 2.0.20",
  "tokio",

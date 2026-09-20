@@ -1,5 +1,7 @@
 use clap::{ColorChoice, Parser, Subcommand};
-use fuin_controller::types::{FuinPublicKey, FuinSealedSecret, FuinSealedSecretSpec};
+use fuin_controller::types::{
+    FuinPublicKey, FuinSealedSecret, FuinSealedSecretSpec, SecretTemplate,
+};
 use fuin_core::encryption;
 use k8s_openapi::api::core::v1::Secret;
 use kube::{
@@ -7,6 +9,7 @@ use kube::{
     api::{Patch, PatchParams},
     runtime::events::{Event, EventType, Recorder},
 };
+use serde_json::Value;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use thiserror::Error;
@@ -19,6 +22,8 @@ enum Error {
     Encryption(#[from] encryption::Error),
     #[error("input error: {0}")]
     Input(String),
+    #[error("serialization error: {0}")]
+    Serialization(#[from] serde_json::Error),
     #[error("the Kubernetes Secret `{0}` has no data entries")]
     EmptySecret(String),
 }
@@ -100,6 +105,19 @@ async fn seal(args: SealArgs) -> Result<(), Error> {
         }
     };
     let source_name = source.name_any();
+    let mut template_metadata = BTreeMap::new();
+    template_metadata.insert("name".into(), Value::String(source_name.clone()));
+    if let Some(labels) = &source.metadata.labels {
+        template_metadata.insert("labels".into(), serde_json::to_value(labels)?);
+    }
+    if let Some(annotations) = &source.metadata.annotations {
+        template_metadata.insert("annotations".into(), serde_json::to_value(annotations)?);
+    }
+    let template = SecretTemplate {
+        metadata: Some(template_metadata),
+        r#type: source.type_.clone(),
+        immutable: source.immutable,
+    };
     let public_keys: Api<FuinPublicKey> = Api::all(client.clone());
     let public_key = public_keys.get(&args.public_key).await?;
 
@@ -129,7 +147,7 @@ async fn seal(args: SealArgs) -> Result<(), Error> {
         &source_name,
         FuinSealedSecretSpec {
             encrypted_data: source_data,
-            template: None,
+            template: Some(template),
         },
     );
     sealed_secret.metadata.namespace = Some(namespace.clone());

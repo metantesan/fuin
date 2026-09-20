@@ -77,6 +77,7 @@ pub struct FuinSealedSecretSpec {
 pub struct SecretTemplate {
     pub metadata: Option<BTreeMap<String, Value>>,
     pub r#type: Option<String>,
+    pub immutable: Option<bool>,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, Default, JsonSchema)]

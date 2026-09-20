@@ -30,7 +30,7 @@ helm install fuin ./charts/fuin \
   --namespace fuin-system \
   --create-namespace \
   -f charts/fuin/values-main.yaml
-```gi
+```
 
 The controller creates its private key in its own namespace. The private key
 is a namespaced `FuinPrivateKey` and is never published outside the cluster.

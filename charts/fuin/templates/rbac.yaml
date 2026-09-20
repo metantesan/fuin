@@ -44,6 +44,7 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: {{ include "fuin.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
 roleRef:
   kind: ClusterRole
   name: {{ include "fuin.fullname" . }}

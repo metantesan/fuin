@@ -8,6 +8,7 @@ use kube::{
     runtime::events::{Event, EventType, Recorder},
 };
 use std::collections::BTreeMap;
+use std::path::PathBuf;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -16,8 +17,8 @@ enum Error {
     Kubernetes(#[from] kube::Error),
     #[error("encryption error: {0}")]
     Encryption(#[from] encryption::Error),
-    #[error("serialization error: {0}")]
-    Serialization(#[from] serde_json::Error),
+    #[error("input error: {0}")]
+    Input(String),
     #[error("the Kubernetes Secret `{0}` has no data entries")]
     EmptySecret(String),
 }
@@ -38,19 +39,28 @@ enum Command {
 #[derive(Debug, clap::Args)]
 struct SealArgs {
     /// Kubernetes namespace containing the source Secret.
-    #[arg(short, long, default_value = "default")]
-    namespace: String,
+    #[arg(short, long)]
+    namespace: Option<String>,
 
-    /// Name of the source Kubernetes Secret.
-    secret: String,
+    /// Name of the source Kubernetes Secret in the current kube context.
+    #[arg(conflicts_with = "from_file")]
+    secret: Option<String>,
+
+    /// Path to a Kubernetes Secret YAML file.
+    #[arg(long = "from-file", conflicts_with = "secret")]
+    from_file: Option<PathBuf>,
 
     /// Name of the cluster-scoped FuinPublicKey.
     #[arg(long, default_value = "fuin-controller")]
     public_key: String,
 
-    /// Print the generated object without applying it.
+    /// Write the generated FuinSealedSecret to a file instead of stdout.
+    #[arg(long, value_name = "PATH")]
+    output: Option<PathBuf>,
+
+    /// Apply the generated FuinSealedSecret to the current kube context.
     #[arg(long)]
-    dry_run: bool,
+    apply: bool,
 }
 
 #[tokio::main]
@@ -63,18 +73,51 @@ async fn main() -> Result<(), Error> {
 
 async fn seal(args: SealArgs) -> Result<(), Error> {
     let client = Client::try_default().await?;
-    let secrets: Api<Secret> = Api::namespaced(client.clone(), &args.namespace);
-    let source = secrets.get(&args.secret).await?;
+    let (namespace, source) = match (&args.secret, &args.from_file) {
+        (Some(name), None) => {
+            let namespace = args.namespace.as_deref().unwrap_or("default");
+            let secrets: Api<Secret> = Api::namespaced(client.clone(), namespace);
+            (namespace.to_owned(), secrets.get(name).await?)
+        }
+        (None, Some(path)) => {
+            let content = std::fs::read_to_string(path).map_err(|error| {
+                Error::Input(format!("failed to read {}: {error}", path.display()))
+            })?;
+            let source: Secret = serde_yaml_ng::from_str(&content).map_err(|error| {
+                Error::Input(format!("failed to parse {}: {error}", path.display()))
+            })?;
+            let namespace = args
+                .namespace
+                .clone()
+                .or_else(|| source.metadata.namespace.clone())
+                .unwrap_or_else(|| "default".into());
+            (namespace, source)
+        }
+        _ => {
+            return Err(Error::Input(
+                "provide either a Secret name or --from-file".into(),
+            ));
+        }
+    };
     let source_name = source.name_any();
     let public_keys: Api<FuinPublicKey> = Api::all(client.clone());
     let public_key = public_keys.get(&args.public_key).await?;
 
-    let source_data = source
+    let mut plaintext_data = source
         .data
         .unwrap_or_default()
         .into_iter()
+        .map(|(name, value)| (name, value.0))
+        .collect::<BTreeMap<_, _>>();
+    if let Some(string_data) = source.string_data {
+        for (name, value) in string_data {
+            plaintext_data.insert(name, value.into_bytes());
+        }
+    }
+    let source_data = plaintext_data
+        .into_iter()
         .map(|(name, value)| {
-            encryption::encrypt(&public_key.spec.public_key, value.0)
+            encryption::encrypt(&public_key.spec.public_key, value)
                 .map(|encrypted| (name, encrypted))
         })
         .collect::<Result<BTreeMap<_, _>, encryption::Error>>()?;
@@ -90,13 +133,25 @@ async fn seal(args: SealArgs) -> Result<(), Error> {
         },
     );
 
-    if args.dry_run {
-        println!("{}", serde_json::to_string_pretty(&sealed_secret)?);
+    let yaml = serde_yaml_ng::to_string(&sealed_secret)
+        .map_err(|error| Error::Input(format!("failed to serialize sealed secret: {error}")))?;
+    if let Some(path) = &args.output {
+        std::fs::write(path, &yaml).map_err(|error| {
+            Error::Input(format!("failed to write {}: {error}", path.display()))
+        })?;
+        if !args.apply {
+            eprintln!("wrote {}", path.display());
+        }
+    } else if !args.apply {
+        print!("{yaml}");
+    }
+
+    if !args.apply {
         return Ok(());
     }
 
     let object_ref = sealed_secret.object_ref(&());
-    let sealed_secrets: Api<FuinSealedSecret> = Api::namespaced(client.clone(), &args.namespace);
+    let sealed_secrets: Api<FuinSealedSecret> = Api::namespaced(client.clone(), &namespace);
     sealed_secrets
         .patch(
             &source_name,
@@ -118,7 +173,7 @@ async fn seal(args: SealArgs) -> Result<(), Error> {
         .await?;
     println!(
         "sealed Secret `{}` in namespace `{}`",
-        source_name, args.namespace
+        source_name, namespace
     );
     Ok(())
 }

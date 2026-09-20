@@ -90,6 +90,50 @@ pub struct FuinSealedSecretStatus {
     pub conditions: Vec<FuinCondition>,
 }
 
+/// Cluster-scoped encrypted values propagated into selected namespaces.
+#[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema)]
+#[kube(
+    group = "fuin.abr.sh",
+    version = "v1alpha1",
+    kind = "FuinClusterSealedSecret",
+    status = "FuinClusterSealedSecretStatus",
+    shortname = "fcss",
+    printcolumn(json_path = ".status.phase", name = "STATUS", type_ = "string"),
+    printcolumn(
+        json_path = ".status.namespaceCount",
+        name = "NAMESPACES",
+        type_ = "integer"
+    ),
+    printcolumn(
+        json_path = ".metadata.creationTimestamp",
+        name = "AGE",
+        type_ = "date"
+    )
+)]
+#[serde(rename_all = "camelCase")]
+pub struct FuinClusterSealedSecretSpec {
+    pub encrypted_data: BTreeMap<String, String>,
+    pub namespace_selector: NamespaceSelector,
+    pub exclude_namespaces: Vec<String>,
+    pub template: Option<SecretTemplate>,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, Default, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct NamespaceSelector {
+    pub match_labels: BTreeMap<String, String>,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, Default, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct FuinClusterSealedSecretStatus {
+    pub phase: Option<SecretPhase>,
+    pub message: Option<String>,
+    pub namespace_count: Option<i32>,
+    pub observed_generation: Option<i64>,
+    pub conditions: Vec<FuinCondition>,
+}
+
 #[derive(Deserialize, Serialize, Clone, Debug, JsonSchema)]
 #[serde(rename_all = "PascalCase")]
 pub enum KeyPhase {

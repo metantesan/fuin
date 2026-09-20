@@ -5,7 +5,7 @@ replicaCount: 1
 image:
   repository: ghcr.io/metantesan/fuin
   pullPolicy: IfNotPresent
-  tag: "letest"
+  tag: ""
 
 imagePullSecrets: []
 nameOverride: ""

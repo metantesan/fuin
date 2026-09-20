@@ -1,0 +1,5 @@
+# Values for testing the image published from the main branch.
+image:
+  repository: ghcr.io/metantesan/fuin/fuin-controller
+  pullPolicy: Always
+  tag: main

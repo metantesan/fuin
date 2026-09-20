@@ -5,7 +5,7 @@ WORKDIR /app
 COPY Cargo.toml Cargo.lock ./
 COPY crates/ ./crates/
 
-RUN cargo build --release -p fuin-controller
+RUN cargo build --release -p fuin_controller
 
 FROM debian:bookworm-slim
 
@@ -15,7 +15,7 @@ RUN apt-get update && apt-get install -y \
 
 RUN useradd --system --no-create-home --shell /usr/sbin/nologin fuin
 
-COPY --from=builder /app/target/release/fuin-controller /usr/local/bin/fuin-controller
+COPY --from=builder /app/target/release/fuin_controller /usr/local/bin/fuin-controller
 RUN chown fuin:fuin /usr/local/bin/fuin-controller
 
 USER fuin

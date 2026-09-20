@@ -7,10 +7,15 @@ authors.workspace = true
 repository.workspace = true
 
 [dependencies]
+fuin_core.workspace = true
+futures.workspace = true
 kube.workspace = true
 k8s-openapi.workspace = true
 schemars.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
 [lints]
 workspace = true

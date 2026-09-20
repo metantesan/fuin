@@ -34,6 +34,14 @@ pub fn generate_keypair() -> KeyPair {
     }
 }
 
+/// Derive the public age key from a private age key.
+pub fn public_key(private_key: &str) -> Result<String> {
+    let identity = private_key
+        .parse::<x25519::Identity>()
+        .map_err(|error| Error::InvalidPrivateKey(error.to_string()))?;
+    Ok(identity.to_public().to_string())
+}
+
 /// Encrypt plaintext for an age X25519 public key and return ASCII-armored text.
 pub fn encrypt(public_key: &str, plaintext: impl AsRef<[u8]>) -> Result<String> {
     let recipient = public_key

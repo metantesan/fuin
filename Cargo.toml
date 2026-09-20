@@ -25,9 +25,10 @@ schemars = { version = "1" }
 serde = { version = "1", features = ["derive"] }
 serde_yaml_ng = { version = "0.10" }
 serde_json = { version = "1" }
+futures = { version = "0.3" }
 # Tokio
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
-traceing = { version = "0.3" }
+tracing = { version = "0.1" }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # Encryption
 age = { version = "0.12", features = ["armor"] }

@@ -1,5 +1,5 @@
 [package]
-name = "fuin-controller"
+name = "controller"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

@@ -1,6 +1,7 @@
 use clap::{ColorChoice, Parser, Subcommand};
 use fuin_controller::types::{
-    FuinPublicKey, FuinSealedSecret, FuinSealedSecretSpec, SecretTemplate,
+    FuinClusterSealedSecret, FuinClusterSealedSecretSpec, FuinPublicKey, FuinSealedSecret,
+    FuinSealedSecretSpec, NamespaceSelector, SecretTemplate,
 };
 use fuin_core::encryption;
 use k8s_openapi::api::core::v1::Secret;
@@ -66,6 +67,18 @@ struct SealArgs {
     /// Apply the generated FuinSealedSecret to the current kube context.
     #[arg(long)]
     apply: bool,
+
+    /// Create a cluster-scoped FuinClusterSealedSecret.
+    #[arg(long)]
+    cluster_wide: bool,
+
+    /// Include namespaces matching a label, for example team=platform. Repeatable.
+    #[arg(long = "namespace-label")]
+    namespace_labels: Vec<String>,
+
+    /// Exclude a namespace from cluster-wide propagation. Repeatable.
+    #[arg(long = "exclude-namespace")]
+    exclude_namespaces: Vec<String>,
 }
 
 #[tokio::main]
@@ -143,6 +156,22 @@ async fn seal(args: SealArgs) -> Result<(), Error> {
         return Err(Error::EmptySecret(source_name.clone()));
     }
 
+    if args.cluster_wide {
+        let namespace_selector = NamespaceSelector {
+            match_labels: parse_labels(&args.namespace_labels)?,
+        };
+        let sealed_secret = FuinClusterSealedSecret::new(
+            &source_name,
+            FuinClusterSealedSecretSpec {
+                encrypted_data: source_data,
+                namespace_selector,
+                exclude_namespaces: args.exclude_namespaces.clone(),
+                template: Some(template),
+            },
+        );
+        return output_or_apply_cluster(client, &args, &source_name, sealed_secret).await;
+    }
+
     let mut sealed_secret = FuinSealedSecret::new(
         &source_name,
         FuinSealedSecretSpec {
@@ -151,7 +180,34 @@ async fn seal(args: SealArgs) -> Result<(), Error> {
         },
     );
     sealed_secret.metadata.namespace = Some(namespace.clone());
+    output_or_apply_namespaced(client, &args, &source_name, namespace, sealed_secret).await
+}
 
+fn parse_labels(labels: &[String]) -> Result<BTreeMap<String, String>, Error> {
+    labels
+        .iter()
+        .map(|label| {
+            label.split_once('=').map_or_else(
+                || Err(Error::Input(format!("label must use key=value: {label}"))),
+                |(key, value)| {
+                    if key.is_empty() || value.is_empty() {
+                        Err(Error::Input(format!("label must use key=value: {label}")))
+                    } else {
+                        Ok((key.to_owned(), value.to_owned()))
+                    }
+                },
+            )
+        })
+        .collect()
+}
+
+async fn output_or_apply_namespaced(
+    client: kube::Client,
+    args: &SealArgs,
+    source_name: &str,
+    namespace: String,
+    sealed_secret: FuinSealedSecret,
+) -> Result<(), Error> {
     let yaml = serde_yaml_ng::to_string(&sealed_secret)
         .map_err(|error| Error::Input(format!("failed to serialize sealed secret: {error}")))?;
     if let Some(path) = &args.output {
@@ -194,5 +250,52 @@ async fn seal(args: SealArgs) -> Result<(), Error> {
         "sealed Secret `{}` in namespace `{}`",
         source_name, namespace
     );
+    Ok(())
+}
+
+async fn output_or_apply_cluster(
+    client: kube::Client,
+    args: &SealArgs,
+    source_name: &str,
+    sealed_secret: FuinClusterSealedSecret,
+) -> Result<(), Error> {
+    let yaml = serde_yaml_ng::to_string(&sealed_secret)
+        .map_err(|error| Error::Input(format!("failed to serialize sealed secret: {error}")))?;
+    if let Some(path) = &args.output {
+        std::fs::write(path, &yaml).map_err(|error| {
+            Error::Input(format!("failed to write {}: {error}", path.display()))
+        })?;
+        if !args.apply {
+            eprintln!("wrote {}", path.display());
+        }
+    } else if !args.apply {
+        print!("{yaml}");
+    }
+    if !args.apply {
+        return Ok(());
+    }
+
+    let object_ref = sealed_secret.object_ref(&());
+    let sealed_secrets: Api<FuinClusterSealedSecret> = Api::all(client.clone());
+    sealed_secrets
+        .patch(
+            source_name,
+            &PatchParams::apply("fuin-cli").force(),
+            &Patch::Apply(sealed_secret),
+        )
+        .await?;
+    Recorder::new(client, "fuin-cli".into())
+        .publish(
+            &Event {
+                type_: EventType::Normal,
+                reason: "ClusterSecretSealed".into(),
+                note: Some("Encrypted Secret data and applied FuinClusterSealedSecret".into()),
+                action: "Seal".into(),
+                secondary: None,
+            },
+            &object_ref,
+        )
+        .await?;
+    println!("sealed cluster-wide Secret `{source_name}`");
     Ok(())
 }

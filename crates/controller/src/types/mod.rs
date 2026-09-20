@@ -68,6 +68,8 @@ pub struct FuinPublicKeyStatus {
 )]
 #[serde(rename_all = "camelCase")]
 pub struct FuinSealedSecretSpec {
+    /// Name of the FuinPrivateKey in the same namespace.
+    pub private_key_ref: String,
     pub encrypted_data: BTreeMap<String, String>,
     pub template: Option<SecretTemplate>,
 }

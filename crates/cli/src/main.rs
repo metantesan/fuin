@@ -3,8 +3,9 @@ use fuin_controller::types::{FuinPublicKey, FuinSealedSecret, FuinSealedSecretSp
 use fuin_core::encryption;
 use k8s_openapi::api::core::v1::Secret;
 use kube::{
-    Api, Client, ResourceExt,
+    Api, Client, Resource, ResourceExt,
     api::{Patch, PatchParams},
+    runtime::events::{Event, EventType, Recorder},
 };
 use std::collections::BTreeMap;
 use thiserror::Error;
@@ -94,12 +95,25 @@ async fn seal(args: SealArgs) -> Result<(), Error> {
         return Ok(());
     }
 
-    let sealed_secrets: Api<FuinSealedSecret> = Api::namespaced(client, &args.namespace);
+    let object_ref = sealed_secret.object_ref(&());
+    let sealed_secrets: Api<FuinSealedSecret> = Api::namespaced(client.clone(), &args.namespace);
     sealed_secrets
         .patch(
             &source_name,
             &PatchParams::apply("fuin-cli").force(),
             &Patch::Apply(sealed_secret),
+        )
+        .await?;
+    Recorder::new(client, "fuin-cli".into())
+        .publish(
+            &Event {
+                type_: EventType::Normal,
+                reason: "SecretSealed".into(),
+                note: Some("Encrypted Secret data and applied FuinSealedSecret".into()),
+                action: "Seal".into(),
+                secondary: None,
+            },
+            &object_ref,
         )
         .await?;
     println!(

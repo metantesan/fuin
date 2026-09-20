@@ -10,7 +10,12 @@ use k8s_openapi::{
 use kube::{
     Api, Client, Resource, ResourceExt,
     api::{Patch, PatchParams, PostParams},
-    runtime::{Controller, controller::Action, watcher},
+    runtime::{
+        Controller,
+        controller::Action,
+        events::{Event, EventType, Recorder},
+        watcher,
+    },
 };
 use serde_json::json;
 use std::{collections::BTreeMap, sync::Arc};
@@ -41,6 +46,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub struct Context {
     client: Client,
     private_key: String,
+    recorder: Recorder,
 }
 
 pub async fn run() -> Result<()> {
@@ -55,6 +61,7 @@ pub async fn run() -> Result<()> {
     let context = Arc::new(Context {
         client: client.clone(),
         private_key,
+        recorder: Recorder::new(client.clone(), "fuin-controller".into()),
     });
     let sealed_secrets = Api::<FuinSealedSecret>::all(client);
 
@@ -119,8 +126,28 @@ async fn ensure_controller_key(client: &Client, namespace: &str) -> Result<Strin
 
 async fn reconcile(sealed_secret: Arc<FuinSealedSecret>, context: Arc<Context>) -> Result<Action> {
     match reconcile_inner(&sealed_secret, &context).await {
-        Ok(action) => Ok(action),
+        Ok(action) => {
+            publish_event(
+                &context,
+                &sealed_secret,
+                EventType::Normal,
+                "SecretApplied",
+                "Apply",
+                "Decrypted values and applied the generated Kubernetes Secret".into(),
+            )
+            .await;
+            Ok(action)
+        }
         Err(error) => {
+            publish_event(
+                &context,
+                &sealed_secret,
+                EventType::Warning,
+                "ReconcileFailed",
+                "Reconcile",
+                error.to_string(),
+            )
+            .await;
             if let Err(status_error) = patch_status(
                 &context.client,
                 &sealed_secret,
@@ -134,6 +161,30 @@ async fn reconcile(sealed_secret: Arc<FuinSealedSecret>, context: Arc<Context>) 
             }
             Err(error)
         }
+    }
+}
+
+async fn publish_event(
+    context: &Context,
+    sealed_secret: &FuinSealedSecret,
+    event_type: EventType,
+    reason: &str,
+    action: &str,
+    note: String,
+) {
+    let event = Event {
+        type_: event_type,
+        reason: reason.into(),
+        note: Some(note),
+        action: action.into(),
+        secondary: None,
+    };
+    if let Err(error) = context
+        .recorder
+        .publish(&event, &sealed_secret.object_ref(&()))
+        .await
+    {
+        warn!(%error, "failed to publish Kubernetes event");
     }
 }
 

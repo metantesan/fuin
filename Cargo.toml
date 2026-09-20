@@ -4,7 +4,7 @@ members = ["crates/*"]
 default-members = ["crates/controller"]
 
 [workspace.package]
-version = "0.0.1"
+version = "0.1.0"
 edition = "2024"
 license = "BSD-3-Clause"
 authors = ["hikari <me@metantesan.com>"]

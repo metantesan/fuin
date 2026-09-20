@@ -4,34 +4,51 @@ metadata:
   name: fuinpublickeys.fuin.abr.sh
 spec:
   group: fuin.abr.sh
-  scope: Cluster
   names:
-    plural: fuinpublickeys
-    singular: fuinpublickey
     kind: FuinPublicKey
+    plural: fuinpublickeys
     shortNames:
-      - fpubk
+    - fpubk
+    singular: fuinpublickey
+  scope: Cluster
   versions:
-    - name: v1alpha1
-      served: true
-      storage: true
-      schema:
-        openAPIV3Schema:
-          type: object
-          required:
-            - spec
-          properties:
-            spec:
-              type: object
-              required:
-                - publicKey
-              properties:
-                publicKey:
-                  type: string
-                  description: Public key used to encrypt values for Fuin.
-                  minLength: 1
-            status:
-              type: object
-              x-kubernetes-preserve-unknown-fields: true
-      subresources:
-        status: {}
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: Auto-generated derived type for FuinPublicKeySpec via `CustomResource`
+        properties:
+          spec:
+            description: Cluster-scoped public key used by clients to encrypt values.
+            properties:
+              publicKey:
+                type: string
+            required:
+            - publicKey
+            type: object
+          status:
+            nullable: true
+            properties:
+              message:
+                nullable: true
+                type: string
+              observedGeneration:
+                format: int64
+                nullable: true
+                type: integer
+              phase:
+                enum:
+                - Pending
+                - Applied
+                - Failed
+                - null
+                nullable: true
+                type: string
+            type: object
+        required:
+        - spec
+        title: FuinPublicKey
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

@@ -7,6 +7,6 @@ authors.workspace = true
 repository.workspace = true
 
 [dependencies]
-
+age.workspace = true
 [lints]
 workspace = true

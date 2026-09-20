@@ -28,6 +28,9 @@ serde_json = { version = "1" }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 traceing = { version = "0.3" }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+# Encryption
+age = "0.12"
+
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

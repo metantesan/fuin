@@ -16,6 +16,7 @@ fuin_controller = { path = "crates/controller" }
 # Errors
 eyre = { version = "0.6" }
 color-eyre = { version = "0.6" }
+thiserror = { version = "2" }
 # Kube
 kube = { version = "4.2", features = ["runtime", "derive"] }
 k8s-openapi = { version = "0.28", features = ["latest", "schemars"] }
@@ -29,7 +30,7 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 traceing = { version = "0.3" }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # Encryption
-age = "0.12"
+age = { version = "0.12", features = ["armor"] }
 
 
 [workspace.lints.rust]

@@ -125,13 +125,14 @@ async fn seal(args: SealArgs) -> Result<(), Error> {
         return Err(Error::EmptySecret(source_name.clone()));
     }
 
-    let sealed_secret = FuinSealedSecret::new(
+    let mut sealed_secret = FuinSealedSecret::new(
         &source_name,
         FuinSealedSecretSpec {
             encrypted_data: source_data,
             template: None,
         },
     );
+    sealed_secret.metadata.namespace = Some(namespace.clone());
 
     let yaml = serde_yaml_ng::to_string(&sealed_secret)
         .map_err(|error| Error::Input(format!("failed to serialize sealed secret: {error}")))?;

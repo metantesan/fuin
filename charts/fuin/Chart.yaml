@@ -2,7 +2,7 @@ apiVersion: v2
 name: fuin
 description: Helm chart for the Fuin controller
 type: application
-version: 0.0.5
+version: 0.0.6
 appVersion: "0.0.1"
 home: https://github.com/metantesan/fuin
 sources:

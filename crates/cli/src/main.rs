@@ -1,4 +1,5 @@
 use clap::{ColorChoice, Parser, Subcommand};
+use color_eyre::eyre::{Result, WrapErr, bail, eyre};
 use fuin_controller::types::{
     FuinClusterSealedSecret, FuinClusterSealedSecretSpec, FuinPublicKey, FuinSealedSecret,
     FuinSealedSecretSpec, NamespaceSelector, SecretTemplate,
@@ -13,21 +14,6 @@ use kube::{
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
-use thiserror::Error;
-
-#[derive(Debug, Error)]
-enum Error {
-    #[error("Kubernetes API error: {0}")]
-    Kubernetes(#[from] kube::Error),
-    #[error("encryption error: {0}")]
-    Encryption(#[from] encryption::Error),
-    #[error("input error: {0}")]
-    Input(String),
-    #[error("serialization error: {0}")]
-    Serialization(#[from] serde_json::Error),
-    #[error("the Kubernetes Secret `{0}` has no data entries")]
-    EmptySecret(String),
-}
 
 #[derive(Debug, Parser)]
 #[command(name = "fuin", version, color = ColorChoice::Always)]
@@ -82,14 +68,15 @@ struct SealArgs {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Error> {
+async fn main() -> Result<()> {
+    color_eyre::install()?;
     let cli = Cli::parse();
     match cli.command {
         Command::Seal(args) => seal(args).await,
     }
 }
 
-async fn seal(args: SealArgs) -> Result<(), Error> {
+async fn seal(args: SealArgs) -> Result<()> {
     let client = Client::try_default().await?;
     let (namespace, source) = match (&args.secret, &args.from_file) {
         (Some(name), None) => {
@@ -98,12 +85,10 @@ async fn seal(args: SealArgs) -> Result<(), Error> {
             (namespace.to_owned(), secrets.get(name).await?)
         }
         (None, Some(path)) => {
-            let content = std::fs::read_to_string(path).map_err(|error| {
-                Error::Input(format!("failed to read {}: {error}", path.display()))
-            })?;
-            let source: Secret = serde_yaml_ng::from_str(&content).map_err(|error| {
-                Error::Input(format!("failed to parse {}: {error}", path.display()))
-            })?;
+            let content = std::fs::read_to_string(path)
+                .wrap_err_with(|| format!("failed to read {}", path.display()))?;
+            let source: Secret = serde_yaml_ng::from_str(&content)
+                .wrap_err_with(|| format!("failed to parse {}", path.display()))?;
             let namespace = args
                 .namespace
                 .clone()
@@ -112,9 +97,7 @@ async fn seal(args: SealArgs) -> Result<(), Error> {
             (namespace, source)
         }
         _ => {
-            return Err(Error::Input(
-                "provide either a Secret name or --from-file".into(),
-            ));
+            bail!("provide either a Secret name or --from-file");
         }
     };
     let source_name = source.name_any();
@@ -153,7 +136,7 @@ async fn seal(args: SealArgs) -> Result<(), Error> {
         })
         .collect::<Result<BTreeMap<_, _>, encryption::Error>>()?;
     if source_data.is_empty() {
-        return Err(Error::EmptySecret(source_name.clone()));
+        bail!("the Kubernetes Secret `{source_name}` has no data entries");
     }
 
     if args.cluster_wide {
@@ -183,20 +166,17 @@ async fn seal(args: SealArgs) -> Result<(), Error> {
     output_or_apply_namespaced(client, &args, &source_name, namespace, sealed_secret).await
 }
 
-fn parse_labels(labels: &[String]) -> Result<BTreeMap<String, String>, Error> {
+fn parse_labels(labels: &[String]) -> Result<BTreeMap<String, String>> {
     labels
         .iter()
         .map(|label| {
-            label.split_once('=').map_or_else(
-                || Err(Error::Input(format!("label must use key=value: {label}"))),
-                |(key, value)| {
-                    if key.is_empty() || value.is_empty() {
-                        Err(Error::Input(format!("label must use key=value: {label}")))
-                    } else {
-                        Ok((key.to_owned(), value.to_owned()))
-                    }
-                },
-            )
+            let (key, value) = label
+                .split_once('=')
+                .ok_or_else(|| eyre!("label must use key=value: {label}"))?;
+            if key.is_empty() || value.is_empty() {
+                bail!("label must use key=value: {label}");
+            }
+            Ok((key.to_owned(), value.to_owned()))
         })
         .collect()
 }
@@ -207,13 +187,12 @@ async fn output_or_apply_namespaced(
     source_name: &str,
     namespace: String,
     sealed_secret: FuinSealedSecret,
-) -> Result<(), Error> {
-    let yaml = serde_yaml_ng::to_string(&sealed_secret)
-        .map_err(|error| Error::Input(format!("failed to serialize sealed secret: {error}")))?;
+) -> Result<()> {
+    let yaml =
+        serde_yaml_ng::to_string(&sealed_secret).wrap_err("failed to serialize sealed secret")?;
     if let Some(path) = &args.output {
-        std::fs::write(path, &yaml).map_err(|error| {
-            Error::Input(format!("failed to write {}: {error}", path.display()))
-        })?;
+        std::fs::write(path, &yaml)
+            .wrap_err_with(|| format!("failed to write {}", path.display()))?;
         if !args.apply {
             eprintln!("wrote {}", path.display());
         }
@@ -258,13 +237,12 @@ async fn output_or_apply_cluster(
     args: &SealArgs,
     source_name: &str,
     sealed_secret: FuinClusterSealedSecret,
-) -> Result<(), Error> {
-    let yaml = serde_yaml_ng::to_string(&sealed_secret)
-        .map_err(|error| Error::Input(format!("failed to serialize sealed secret: {error}")))?;
+) -> Result<()> {
+    let yaml =
+        serde_yaml_ng::to_string(&sealed_secret).wrap_err("failed to serialize sealed secret")?;
     if let Some(path) = &args.output {
-        std::fs::write(path, &yaml).map_err(|error| {
-            Error::Input(format!("failed to write {}: {error}", path.display()))
-        })?;
+        std::fs::write(path, &yaml)
+            .wrap_err_with(|| format!("failed to write {}", path.display()))?;
         if !args.apply {
             eprintln!("wrote {}", path.display());
         }

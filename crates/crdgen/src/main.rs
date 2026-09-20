@@ -1,4 +1,6 @@
-use fuin_controller::types::{FuinPrivateKey, FuinPublicKey, FuinSealedSecret};
+use fuin_controller::types::{
+    FuinClusterSealedSecret, FuinPrivateKey, FuinPublicKey, FuinSealedSecret,
+};
 use kube::CustomResourceExt;
 use serde_yaml_ng::to_string;
 use std::{error::Error, fs, path::PathBuf};
@@ -17,6 +19,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         &output_dir,
         "fuinsealedsecret-crd.yaml",
         FuinSealedSecret::crd(),
+    )?;
+    write_crd(
+        &output_dir,
+        "fuinclustersealedsecret-crd.yaml",
+        FuinClusterSealedSecret::crd(),
     )?;
 
     Ok(())

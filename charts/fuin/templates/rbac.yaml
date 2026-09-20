@@ -14,6 +14,8 @@ rules:
       - fuinpublickeys/status
       - fuinsealedsecrets
       - fuinsealedsecrets/status
+      - fuinclustersealedsecrets
+      - fuinclustersealedsecrets/status
     verbs:
       - get
       - list
@@ -34,6 +36,14 @@ rules:
       - update
       - patch
       - delete
+  - apiGroups:
+      - events.k8s.io
+    resources:
+      - events
+    verbs:
+      - create
+      - patch
+      - update
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

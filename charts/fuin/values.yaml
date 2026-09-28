@@ -3,7 +3,7 @@ replicaCount: 1
 
 # Container image containing the Fuin controller binary.
 image:
-  repository: ghcr.io/metantesan/fuin
+  repository: ghcr.io/metantesan/fuin-controller
   pullPolicy: IfNotPresent
   tag: ""
 
